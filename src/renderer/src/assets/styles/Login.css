@@ -1,0 +1,117 @@
+.login-container {
+  height: 100vh;
+  flex: 1; 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), 
+                    url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&h=1080&fit=crop');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.login-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 50px 40px;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 380px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.logo-container {
+  margin-bottom: 20px;
+}
+
+.logo {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  border: 3px solid var(--theme-accent, #4A90E2);
+}
+
+.company-name {
+  color: var(--theme-accent, #4A90E2);
+  margin: 0 0 10px 0;
+  font-size: 2em;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.subtitle {
+  color: var(--theme-text-light, #999);
+  margin-bottom: 35px;
+  font-size: 0.95em;
+  font-weight: 400;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.input-field {
+  width: 100%;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--theme-border, #E0E0E0);
+  box-sizing: border-box;
+  font-size: 1em;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--theme-accent, #4A90E2);
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.input-field::placeholder {
+  color: #999;
+}
+
+.login-button {
+  width: 100%;
+  padding: 16px;
+  margin-top: 10px;
+  background: var(--theme-accent, #4A90E2);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 1.1em;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+}
+
+.login-button:hover {
+  background: var(--theme-accent-dark, #357ABD);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(74, 144, 226, 0.3);
+}
+
+.login-button:active {
+  transform: translateY(0);
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+  .login-card {
+    width: 90%;
+    padding: 40px 30px;
+  }
+  
+  .company-name {
+    font-size: 1.8em;
+  }
+}
