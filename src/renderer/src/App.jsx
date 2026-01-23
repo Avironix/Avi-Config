@@ -1,213 +1,224 @@
-import { useState, useEffect } from 'react'
-import { THEME } from './theme'
+import React, { useState, useEffect, useRef } from 'react'
+import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 
-// Components & Pages
-import Sidebar from './components/Sidebar'
+// PAGES
 import Login from './pages/Login'
-import DroneDetails from './pages/DroneDetails'
-import FirmwareUpgrade from './pages/FirmwareUpgrade'
+import ConnectPage from './pages/ConnectPage'
+import Dashboard from './pages/Dashboard'
 import AdvancedSettings from './pages/AdvancedSettings'
+import FirmwareUpgrade from './pages/FirmwareUpgrade'
 import ResetParameters from './pages/ResetParameters'
 
-// ================================
-// MAVLink Helper
-// ================================
-function charsToString(charArray) {
-  if (!charArray) return ''
+// COMPONENTS
+import Sidebar from './components/Sidebar'
+import Header from './components/Header'
 
-  return Array.from(charArray)
-    .map(c => String.fromCharCode(c))
-    .join('')
-    .replace(/\0/g, '')
-    .trim()
-}
-
-function App() {
-  // ================================
-  // STATE
-  // ================================
-
-
+function AppContent() {
+  // --- STATE ---
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [activeTab, setActiveTab] = useState('DETAILS')
-  const [ports, setPorts] = useState([])
-  const [connectedPort, setConnectedPort] = useState(null)
+  const [isConnected, setIsConnected] = useState(false)
+  const [mavData, setMavData] = useState(null)
+  const [paramsData, setParamsData] = useState({})
+  const [showPopup, setShowPopup] = useState(false)
+  const [isUpgrading, setIsUpgrading] = useState(false)
 
-  const [attitude, setAttitude] = useState({
-    roll: 0,
-    pitch: 0,
-    yaw: 0
-  })
+  // --- REFS (For Performance Buffering) ---
+  const paramsBuffer = useRef({})
+  const lastUpdate = useRef(Date.now())
 
-  const [parameters, setParameters] = useState({})
-  const [expectedParamCount, setExpectedParamCount] = useState(null)
-  const [hasHeartbeat, setHasHeartbeat] = useState(false)
+  const navigate = useNavigate()
 
-  // ================================
-  // MAVLINK LISTENER
-  // ================================
- useEffect(() => {
-  const handler = (data) => {
-    const packet = JSON.parse(data.json)
-
-    // ❤️ HEARTBEAT
-    if (packet.header.msgid === 0) {
-      setHasHeartbeat(true)
-      console.log('❤️ HEARTBEAT')
-    }
-
-    // 🧭 ATTITUDE
-    if (packet.header.msgid === 30) {
-      setAttitude({
-        roll: ((packet.roll * 180) / Math.PI).toFixed(1),
-        pitch: ((packet.pitch * 180) / Math.PI).toFixed(1),
-        yaw: ((packet.yaw * 180) / Math.PI).toFixed(1)
-      })
-    }
-
-    // ⚙️ PARAMETER VALUE
-    if (packet.header.msgid === 22 && packet.param_id) {
-      const cleanId = charsToString(packet.param_id)
-
-      setExpectedParamCount(packet.param_count)
-
-      setParameters(prev => ({
-        ...prev,
-        [cleanId]: {
-          id: cleanId,
-          value: packet.param_value,
-          index: packet.param_index,
-          count: packet.param_count
-        }
-      }))
-    }
-  }
-
-  // REGISTER
-  window.api.onMavlinkData(handler)
-
-  // CLEANUP (Electron-safe)
-  return () => {
-    window.api.offMavlinkData(handler)
-  }
-}, [])
-
-
-  // ================================
-  // PARAM LOAD MONITOR (OPTIONAL)
-  // ================================
+  // --- 1. DATA LISTENER (The Brain) ---
   useEffect(() => {
-    if (!expectedParamCount) return
+    const removeListener = window.api.onMavlinkData((dataWrapper) => {
+      // 1. Store Live Telemetry (Attitude, Battery) - Always update
+      setMavData(dataWrapper)
 
-    const loaded = Object.keys(parameters).length
+      try {
+        const packet = JSON.parse(dataWrapper.json)
 
-    if (loaded === expectedParamCount) {
-      console.log('✅ FULL PARAMETER LIST LOADED')
+        // 2. CAPTURE PARAMETERS (Msg ID 22) [FIXED LOGIC]
+        if (packet.header.msgid === 22 || packet.param_id) {
+          const id = packet.param_id
+
+          // Save to Buffer (Instant, no re-render)
+          paramsBuffer.current[id] = {
+            id: id,
+            value: packet.param_value,
+            count: packet.param_count,
+            index: packet.param_index
+          }
+
+          // 3. FLUSH TO SCREEN (Throttled)
+          // Only update React State every 500ms to prevent freezing
+          const now = Date.now()
+          if (now - lastUpdate.current > 500) {
+            setParamsData({ ...paramsBuffer.current }) // Copy buffer to state
+            lastUpdate.current = now
+          }
+        }
+
+        // 4. AUTO-CONNECT
+        if (!isConnected && isLoggedIn) setIsConnected(true)
+      } catch (err) {
+        console.error('Packet Parse Error:', err)
+      }
+    })
+
+    return () => removeListener()
+  }, [isConnected, isLoggedIn])
+
+  useEffect(() => {
+    if (isUpgrading) return
+    if (!isLoggedIn) {
+      navigate('/login')
+    } else if (!isConnected) {
+      navigate('/connect')
+    } else {
+      // If we are on login/connect pages but actually connected, go to dashboard
+      const path = window.location.hash
+      if (path.includes('connect') || path.includes('login') || path === '#/') {
+        navigate('/dashboard')
+        setShowPopup(true)
+        setTimeout(() => setShowPopup(false), 3000)
+      }
     }
-  }, [parameters, expectedParamCount])
+  }, [isLoggedIn, isConnected, navigate, isUpgrading])
 
-  // ================================
-  // GLOBAL ACTIONS
-  // ================================
-  const handleScan = async () => {
-    const found = await window.api.getPorts()
-    setPorts(found)
+  // --- ACTIONS ---
+  const handleLogin = () => setIsLoggedIn(true)
+
+  // 1. Tell Backend to close the port (Stops the data flow)
+  const handleDisconnect = async () => {
+    // 1. Tell Backend to close the port (Stops the data flow)
+    await window.api.disconnectDrone()
+
+    // 2. Clear Buffers
+    paramsBuffer.current = {}
+    setParamsData({})
+
+    // 3. Update UI State
+    setMavData(null)
+    setIsConnected(false)
+
+    // Router will automatically send us back to '/connect'
   }
 
-  const handleConnect = async (path) => {
-    try {
-      await window.api.connectDrone(path)
-      setConnectedPort(path)
-    } catch (err) {
-      alert(err)
-    }
+  const handleParamLoad = async () => {
+    setParamsData({}) // Clear table
+    paramsBuffer.current = {} // Clear buffer
+    await window.api.requestParams()
   }
 
-  const handleUploadStart = async (port, file) => {
-    if (connectedPort === port) setConnectedPort(null)
-
-    try {
-      await window.api.uploadFirmware(port, file)
-    } catch (err) {
-      alert('Upload Error: ' + err)
-    }
-  }
-
-  // ================================
-  // LOGIN SCREEN
-  // ================================
-  if (!isLoggedIn) {
-    return <Login onLogin={() => setIsLoggedIn(true)} />
-  }
-
-  // ================================
-  // MAIN UI
-  // ================================
   return (
     <div
       style={{
+        height: '100vh',
+        width: '100vw',
         display: 'flex',
-        width: '100%',
-        height: '90vh',
-        fontFamily: 'Segoe UI, sans-serif',
-        color: THEME.textMain
+        flexDirection: 'column',
+        overflow: 'hidden',
+        background: '#F3F4F6'
       }}
     >
-      {/* SIDEBAR */}
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onLogout={() => setIsLoggedIn(false)}
-      />
+      {/* SUCCESS POPUP */}
+      {showPopup && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#10B981',
+            color: 'white',
+            padding: '12px 30px',
+            borderRadius: '50px',
+            boxShadow: '0 5px 15px rgba(0,0,0,0.2)',
+            zIndex: 9999,
+            fontWeight: 'bold',
+            animation: 'fadeIn 0.5s'
+          }}
+        >
+          ✅ Drone Connected
+        </div>
+      )}
 
-      {/* CONTENT */}
-      <div
-        style={{
-          width: '80%',
-          background: THEME.bg,
-          padding: '40px',
-          overflowY: 'auto'
-        }}
-      >
-        {activeTab === 'DETAILS' && (
-          <DroneDetails
-            attitude={attitude}
-            ports={ports}
-            connectedPort={connectedPort}
-            onScan={handleScan}
-            onConnect={handleConnect}
-          />
-        )}
+      {/* --- ROUTING SWITCH --- */}
+      <Routes>
+        {/* 1. LOGIN */}
+        <Route
+          path="/login"
+          element={!isLoggedIn ? <Login onLogin={handleLogin} /> : <Navigate to="/connect" />}
+        />
 
-        {activeTab === 'UPGRADE' && (
-          <FirmwareUpgrade
-            ports={ports}
-            connectedPort={connectedPort}
-            onScan={handleScan}
-            onUploadStart={handleUploadStart}
-          />
-        )}
+        {/* 2. CONNECT */}
+        <Route
+          path="/connect"
+          element={
+            isLoggedIn && !isConnected ? (
+              <ConnectPage onConnect={() => setIsConnected(true)} />
+            ) : (
+              <Navigate to={isLoggedIn ? '/dashboard' : '/login'} />
+            )
+          }
+        />
 
-        {activeTab === 'ADVANCED' && (
-          <AdvancedSettings
-            paramsData={parameters}
-            onRequestLoad={() => {
-              console.log('🔁 Refresh clicked')
-              if (!hasHeartbeat) {
-                alert('Waiting for vehicle heartbeat...')
-                return
-              }
-              setParameters({})
-              setExpectedParamCount(null)
-              window.api.requestParams()
-            }}
-          />
-        )}
+        {/* 3. MAIN APP (Protected) */}
+        <Route
+          path="/*"
+          element={
+            isLoggedIn && isConnected ? (
+              <div style={{ display: 'flex', height: '100%' }}>
+                {/* SIDEBAR */}
+                <Sidebar />
 
-        {activeTab === 'RESET' && <ResetParameters />}
-      </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  {/* HEADER */}
+                  <Header isConnected={isConnected} onDisconnect={handleDisconnect} />
+
+                  {/* CONTENT */}
+                  <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                    <Routes>
+                      <Route path="dashboard" element={<Dashboard mavData={mavData} />} />
+                      <Route
+                        path="upgrade"
+                        element={
+                          <FirmwareUpgrade
+                            onUpgradeStart={() => setIsUpgrading(true)}
+                            onUpgradeEnd={() => setIsUpgrading(false)}
+                          />
+                        }
+                      />
+                      <Route
+                        path="advanced"
+                        element={
+                          <AdvancedSettings
+                            paramsData={paramsData}
+                            onRequestLoad={handleParamLoad}
+                          />
+                        }
+                      />
+                      <Route path="reset" element={<ResetParameters />} />
+
+                      <Route path="*" element={<Navigate to="/dashboard" />} />
+                    </Routes>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <Navigate to={isLoggedIn ? '/connect' : '/login'} />
+            )
+          }
+        />
+      </Routes>
     </div>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
+  )
+}

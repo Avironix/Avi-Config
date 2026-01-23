@@ -100,18 +100,23 @@ const FirmwareUpgrade = ({ onScan, onUploadStart }) => {
     }, 100); 
   };
 
-  const startUploadProcess = async (portName) => {
-    setIsUploading(true);
-    setProgress(0);
-    setUploadStatus(`Bootloader detected on ${portName}. Starting...`);
-    
-    try {
-      await window.api.uploadFirmware(portName, firmwarePath);
-    } catch (err) {
-      setUploadStatus("Upload Failed: " + err);
-      setIsUploading(false);
-    }
-  };
+  // Inside FirmwareUpgrade.jsx
+
+const startUploadProcess = async (portName) => {
+  setIsUploading(true);
+  setProgress(0);
+  setUploadStatus(`Bootloader detected on ${portName}. Starting...`);
+  
+  try {
+    await window.api.uploadFirmware({ 
+      portPath: portName, 
+      filePath: firmwarePath 
+    });
+  } catch (err) {
+    setUploadStatus("Upload Failed: " + err);
+    setIsUploading(false);
+  }
+};
 
   // --- 4. CANCEL LOGIC ---
   const handleCancel = async () => {
