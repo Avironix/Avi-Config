@@ -1,150 +1,184 @@
-import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef } from 'react'
 
-const MavlinkContext = createContext();
+const MavlinkContext = createContext()
 
-// Helper to clean strings from Char Arrays
+// Helper to clean strings from Char Arrays (if needed for older firmware)
 function charsToString(charArray) {
-  if (!charArray) return '';
+  if (!charArray) return ''
+  if (typeof charArray === 'string') return charArray
   return Array.from(charArray)
-    .map(c => String.fromCharCode(c))
+    .map((c) => String.fromCharCode(c))
     .join('')
     .replace(/\0/g, '')
-    .trim();
+    .trim()
 }
 
 export const MavlinkProvider = ({ children }) => {
-  // --- STATE ---
-  const [connectedPort, setConnectedPort] = useState(null);
-  const [ports, setPorts] = useState([]);
-  const [hasHeartbeat, setHasHeartbeat] = useState(false);
-  const [attitude, setAttitude] = useState({ roll: 0, pitch: 0, yaw: 0 });
-  
-  // Parameters State
-  const [parameters, setParameters] = useState({});
-  const [expectedParamCount, setExpectedParamCount] = useState(0);
-  
-  // Refs (To prevent spamming actions in the high-speed loop)
-  const heartbeatRef = useRef(false);
-  const paramsLoadedRef = useRef(false);
+  // --- ALL STATES ---
+  const [isConnected, setIsConnected] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [mavData, setMavData] = useState(null)
+  const [ports, setPorts] = useState([])
+  const [connectedPort, setConnectedPort] = useState(null)
+  const [attitude, setAttitude] = useState({ roll: 0, pitch: 0, yaw: 0 })
+  const [parameters, setParameters] = useState({})
+  const [expectedParamCount, setExpectedParamCount] = useState(0)
 
-  // --- ACTIONS ---
-  
-  // 1. SCAN PORTS
+  // --- ALL REFS ---
+  const paramsBuffer = useRef({})
+  const lastUpdate = useRef(Date.now())
+  const heartbeatTimeout = useRef(null)
+  const paramsLoadedRef = useRef(false)
+
+  // --- ALL ACTIONS ---
+
+  // 1. Scan Serial Ports
   const scanPorts = async () => {
-    const found = await window.api.getPorts();
-    setPorts(found);
-  };
+    const found = await window.api.getPorts()
+    setPorts(found)
+  }
 
-  // 2. CONNECT
+  // 2. Connect to Drone
   const connectDrone = async (path) => {
     try {
-      // Reset State on new connection
-      setParameters({});
-      setExpectedParamCount(0);
-      setHasHeartbeat(false);
-      setAttitude({ roll: 0, pitch: 0, yaw: 0 });
-      
-      heartbeatRef.current = false;
-      paramsLoadedRef.current = false;
-      
-      await window.api.connectDrone(path);
-      setConnectedPort(path);
+      // Reset state for new connection
+      setParameters({})
+      setExpectedParamCount(0)
+      setAttitude({ roll: 0, pitch: 0, yaw: 0 })
+      paramsBuffer.current = {}
+      paramsLoadedRef.current = false
+
+      const success = await window.api.connectDrone(path)
+      if (success) {
+        setConnectedPort(path)
+      }
+      return success
     } catch (err) {
-      alert(`Connection Failed: ${err}`);
+      console.error('Connection Error:', err)
+      return false
     }
-  };
+  }
 
-  // 3. REQUEST PARAMS (Common Function)
-  const requestParams = () => {
-    if (connectedPort) {
-      console.log("Context: Requesting All Params...");
-      // Clear old data to show progress bar again
-      setParameters({});
-      setExpectedParamCount(0); 
-      paramsLoadedRef.current = false; 
-      
-      // Call Backend
-      window.api.requestParams();
-    }
-  };
+  // 3. Global Disconnect
+  const disconnectDrone = async () => {
+    await window.api.disconnectDrone()
+    setIsConnected(false)
+    setIsSyncing(false)
+    setMavData(null)
+    setConnectedPort(null)
+    setParameters({})
+    paramsBuffer.current = {}
+  }
 
-  // 4. UPDATE PARAM
-  const updateParam = (id, value) => {
-    if (connectedPort) window.api.setParam(id, value);
-  };
+  // 4. Manual/Auto Sync Trigger
+  const startSync = () => {
+    setParameters({})
+    paramsBuffer.current = {}
+    setIsSyncing(true)
+    window.api.requestParams()
+  }
+
+  // 5. Request Params (Aliased for compatibility)
+  const requestParams = async () => {
+    setParameters({})
+    paramsBuffer.current = {}
+    setIsSyncing(true)
+    const success = await window.api.requestParams()
+    if (!success) setIsSyncing(false)
+    return success
+  }
+
+  // 6. Update Single Parameter
+  const updateParam = (id, val) => {
+    return window.api.setParam(id, val)
+  }
 
   // --- GLOBAL MAVLINK LISTENER ---
   useEffect(() => {
-    const handler = (data) => {
-      const packet = JSON.parse(data.json);
+    const handler = (dataWrapper) => {
+      setMavData(dataWrapper)
+      try {
+        const packet = JSON.parse(dataWrapper.json)
 
-      // ❤️ HEARTBEAT LOGIC
-      if (packet.header.msgid === 0) {
-        if (!heartbeatRef.current) {
-          // First Heartbeat detected!
-          heartbeatRef.current = true;
-          setHasHeartbeat(true);
-          console.log("❤️ Heartbeat Detected (System Online)");
-          
-          // AUTO-DOWNLOAD: Trigger similar to your Kotlin 'requestAllParamsList'
-          if (!paramsLoadedRef.current) {
-            console.log("🚀 Auto-triggering Parameter Load...");
-            window.api.requestParams();
-            paramsLoadedRef.current = true; // Lock so we don't spam
-          }
+        // A. Heartbeat Logic (ID 0)
+        if (packet.header.msgid === 0) {
+          if (!isConnected) setIsConnected(true)
+
+          // Watchdog: If no heartbeat for 3s, set disconnected
+          clearTimeout(heartbeatTimeout.current)
+          heartbeatTimeout.current = setTimeout(() => setIsConnected(false), 3000)
         }
-      }
 
-      // 🧭 ATTITUDE
-      if (packet.header.msgid === 30) {
-        setAttitude({
-          roll: ((packet.roll * 180) / Math.PI).toFixed(1),
-          pitch: ((packet.pitch * 180) / Math.PI).toFixed(1),
-          yaw: ((packet.yaw * 180) / Math.PI).toFixed(1)
-        });
-      }
+        // B. Attitude Logic (ID 30)
+        if (packet.header.msgid === 30) {
+          setAttitude({
+            roll: ((packet.roll * 180) / Math.PI).toFixed(1),
+            pitch: ((packet.pitch * 180) / Math.PI).toFixed(1),
+            yaw: ((packet.yaw * 180) / Math.PI).toFixed(1)
+          })
+        }
 
-      // ⚙️ PARAMETERS
-      if (packet.header.msgid === 22 && packet.param_id) {
-        const cleanId = charsToString(packet.param_id);
-        
-        // Update total expected (sent by drone in every param packet)
-        setExpectedParamCount(packet.param_count);
+        // C. Parameter Sync Logic (ID 22)
+        if (packet.header.msgid === 22 || packet.param_id) {
+          const cleanId = charsToString(packet.param_id)
 
-        setParameters(prev => ({
-          ...prev,
-          [cleanId]: {
+          paramsBuffer.current[cleanId] = {
             id: cleanId,
             value: packet.param_value,
-            index: packet.param_index,
-            count: packet.param_count
+            count: packet.param_count,
+            index: packet.param_index
           }
-        }));
+
+          const loaded = Object.keys(paramsBuffer.current).length
+          const total = packet.param_count
+
+          const now = Date.now()
+          // Throttled update to prevent UI lag
+          if (now - lastUpdate.current > 400 || loaded === total) {
+            setParameters({ ...paramsBuffer.current })
+            setExpectedParamCount(total)
+            lastUpdate.current = now
+
+            if (loaded >= total && total > 0) {
+              setIsSyncing(false) // End sync
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Mavlink Listener Error:', err)
       }
-    };
+    }
 
-    // Bind Listener
-    window.api.onMavlinkData(handler);
-    return () => window.api.offMavlinkData(handler);
-  }, [connectedPort]); // Re-bind if port changes
+    window.api.onMavlinkData(handler)
+    return () => window.api.offMavlinkData(handler)
+  }, [isConnected])
 
-  // Expose everything to the app
   return (
-    <MavlinkContext.Provider value={{
-      connectedPort,
-      ports,
-      hasHeartbeat,
-      attitude,
-      parameters,
-      expectedParamCount,
-      scanPorts,
-      connectDrone,
-      requestParams,
-      updateParam
-    }}>
+    <MavlinkContext.Provider
+      value={{
+        isConnected,
+        isSyncing,
+        mavData,
+        ports,
+        connectedPort,
+        attitude,
+        parameters,
+        expectedParamCount,
+        scanPorts,
+        connectDrone,
+        requestParams,
+        startSync,
+        disconnectDrone,
+        updateParam
+      }}
+    >
       {children}
     </MavlinkContext.Provider>
-  );
-};
+  )
+}
 
-export const useMavlink = () => useContext(MavlinkContext);
+export const useMavlink = () => {
+  const context = useContext(MavlinkContext)
+  if (!context) throw new Error('useMavlink must be used within MavlinkProvider')
+  return context
+}

@@ -12,6 +12,7 @@ const Sidebar = () => {
     { id: '/upgrade',   label: 'Firmware Upgrade' }, // Goes to FirmwareUpgrade.jsx
     { id: '/advanced',  label: 'Advanced Settings' }, // Goes to AdvancedSettings.jsx
     { id: '/reset',     label: 'Reset Parameters' }, // Goes to ResetParameters.jsx
+    { id: '/profile', label: 'Drone Profile' },
   ];
 
   return (

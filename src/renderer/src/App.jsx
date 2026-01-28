@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 
 // PAGES
 import Login from './pages/Login'
 import ConnectPage from './pages/ConnectPage'
 import Dashboard from './pages/Dashboard'
+import DroneProfile from './pages/DroneProfile'
 import AdvancedSettings from './pages/AdvancedSettings'
 import FirmwareUpgrade from './pages/FirmwareUpgrade'
 import ResetParameters from './pages/ResetParameters'
@@ -13,206 +14,116 @@ import ResetParameters from './pages/ResetParameters'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 
+// CONTEXT
+import { useMavlink } from './context/MavlinkContext'
+
 function AppContent() {
-  // --- STATE ---
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [isConnected, setIsConnected] = useState(false)
-  const [mavData, setMavData] = useState(null)
-  const [paramsData, setParamsData] = useState({})
-  const [showPopup, setShowPopup] = useState(false)
-  const [isUpgrading, setIsUpgrading] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
 
-  // --- REFS (For Performance Buffering) ---
-  const paramsBuffer = useRef({})
-  const lastUpdate = useRef(Date.now())
-
-  const navigate = useNavigate()
-
-  // --- 1. DATA LISTENER (The Brain) ---
-  useEffect(() => {
-    const removeListener = window.api.onMavlinkData((dataWrapper) => {
-      // 1. Store Live Telemetry (Attitude, Battery) - Always update
-      setMavData(dataWrapper)
-
-      try {
-        const packet = JSON.parse(dataWrapper.json)
-
-        // 2. CAPTURE PARAMETERS (Msg ID 22) [FIXED LOGIC]
-        if (packet.header.msgid === 22 || packet.param_id) {
-          const id = packet.param_id
-
-          // Save to Buffer (Instant, no re-render)
-          paramsBuffer.current[id] = {
-            id: id,
-            value: packet.param_value,
-            count: packet.param_count,
-            index: packet.param_index
-          }
-
-          // 3. FLUSH TO SCREEN (Throttled)
-          // Only update React State every 500ms to prevent freezing
-          const now = Date.now()
-          if (now - lastUpdate.current > 500) {
-            setParamsData({ ...paramsBuffer.current }) // Copy buffer to state
-            lastUpdate.current = now
-          }
-        }
-
-        // 4. AUTO-CONNECT
-        if (!isConnected && isLoggedIn) setIsConnected(true)
-      } catch (err) {
-        console.error('Packet Parse Error:', err)
-      }
-    })
-
-    return () => removeListener()
-  }, [isConnected, isLoggedIn])
+  const { isConnected, isSyncing, mavData, disconnectDrone } = useMavlink();
+  const navigate = useNavigate();
+  
+  // Use a hook to get the current location safely
+  const currentPath = window?.location?.hash || "";
 
   useEffect(() => {
-    if (isUpgrading) return
+    // 1. If we are upgrading, freeze all navigation logic
+    if (isUpgrading) return;
+
     if (!isLoggedIn) {
-      navigate('/login')
-    } else if (!isConnected) {
-      navigate('/connect')
-    } else {
-      // If we are on login/connect pages but actually connected, go to dashboard
-      const path = window.location.hash
-      if (path.includes('connect') || path.includes('login') || path === '#/') {
-        navigate('/dashboard')
-        setShowPopup(true)
-        setTimeout(() => setShowPopup(false), 3000)
+      navigate('/login');
+    } 
+    // 2. Only redirect to connect if NOT on the upgrade page and NOT connected
+    else if (!isConnected && !currentPath.includes("upgrade")) {
+      navigate('/connect');
+    }
+    // 3. Handle auto-navigation to dashboard when connection is restored
+    else if (isConnected && !isSyncing) {
+      if (currentPath.includes('connect') || currentPath.includes('login') || currentPath === '#/') {
+        navigate('/dashboard');
+        setShowPopup(true);
+        setTimeout(() => setShowPopup(false), 3000);
       }
     }
-  }, [isLoggedIn, isConnected, navigate, isUpgrading])
+  }, [isLoggedIn, isConnected, isSyncing, navigate, isUpgrading, currentPath]);
 
-  // --- ACTIONS ---
-  const handleLogin = () => setIsLoggedIn(true)
+  const handleLogin = () => setIsLoggedIn(true);
+  const handleDisconnect = async () => await disconnectDrone();
 
-  // 1. Tell Backend to close the port (Stops the data flow)
-  const handleDisconnect = async () => {
-    // 1. Tell Backend to close the port (Stops the data flow)
-    await window.api.disconnectDrone()
-
-    // 2. Clear Buffers
-    paramsBuffer.current = {}
-    setParamsData({})
-
-    // 3. Update UI State
-    setMavData(null)
-    setIsConnected(false)
-
-    // Router will automatically send us back to '/connect'
-  }
-
-  const handleParamLoad = async () => {
-    setParamsData({}) // Clear table
-    paramsBuffer.current = {} // Clear buffer
-    await window.api.requestParams()
-  }
+  // ✅ CRITICAL RENDER LOGIC: 
+  // We allow the "App Shell" to exist if we are connected OR if we are on the upgrade page
+  const canAccessShell = isLoggedIn && (isConnected || currentPath.includes("upgrade") || isUpgrading);
 
   return (
-    <div
-      style={{
-        height: '100vh',
-        width: '100vw',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        background: '#F3F4F6'
-      }}
-    >
-      {/* SUCCESS POPUP */}
-      {showPopup && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: '#10B981',
-            color: 'white',
-            padding: '12px 30px',
-            borderRadius: '50px',
-            boxShadow: '0 5px 15px rgba(0,0,0,0.2)',
-            zIndex: 9999,
-            fontWeight: 'bold',
-            animation: 'fadeIn 0.5s'
-          }}
-        >
-          ✅ Drone Connected
-        </div>
-      )}
+    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#F3F4F6' }}>
+      {showPopup && <div style={popupStyle}>✅ Drone Connected & Synced</div>}
 
-      {/* --- ROUTING SWITCH --- */}
       <Routes>
-        {/* 1. LOGIN */}
-        <Route
-          path="/login"
-          element={!isLoggedIn ? <Login onLogin={handleLogin} /> : <Navigate to="/connect" />}
-        />
+        <Route path="/login" element={!isLoggedIn ? <Login onLogin={handleLogin} /> : <Navigate to="/connect" />} />
 
-        {/* 2. CONNECT */}
-        <Route
-          path="/connect"
-          element={
-            isLoggedIn && !isConnected ? (
-              <ConnectPage onConnect={() => setIsConnected(true)} />
+        <Route path="/connect" element={
+            isLoggedIn && !isConnected && !currentPath.includes("upgrade") ? (
+              <ConnectPage />
             ) : (
-              <Navigate to={isLoggedIn ? '/dashboard' : '/login'} />
+              <Navigate to="/dashboard" />
             )
           }
         />
 
-        {/* 3. MAIN APP (Protected) */}
-        <Route
-          path="/*"
-          element={
-            isLoggedIn && isConnected ? (
+        {/* PROTECTED APP SHELL */}
+        <Route path="/*" element={
+            canAccessShell ? (
               <div style={{ display: 'flex', height: '100%' }}>
-                {/* SIDEBAR */}
-                <Sidebar />
+                {/* Optional: Hide sidebar during actual flash process for safety */}
+                {!isUpgrading && <Sidebar />}
 
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                  {/* HEADER */}
                   <Header isConnected={isConnected} onDisconnect={handleDisconnect} />
 
-                  {/* CONTENT */}
                   <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
                     <Routes>
                       <Route path="dashboard" element={<Dashboard mavData={mavData} />} />
-                      <Route
-                        path="upgrade"
-                        element={
+                      <Route path="profile" element={<DroneProfile mavData={mavData} />} />
+                      <Route path="upgrade" element={
                           <FirmwareUpgrade
                             onUpgradeStart={() => setIsUpgrading(true)}
                             onUpgradeEnd={() => setIsUpgrading(false)}
                           />
                         }
                       />
-                      <Route
-                        path="advanced"
-                        element={
-                          <AdvancedSettings
-                            paramsData={paramsData}
-                            onRequestLoad={handleParamLoad}
-                          />
-                        }
-                      />
+                      <Route path="advanced" element={<AdvancedSettings />} />
                       <Route path="reset" element={<ResetParameters />} />
-
                       <Route path="*" element={<Navigate to="/dashboard" />} />
                     </Routes>
                   </div>
                 </div>
               </div>
             ) : (
-              <Navigate to={isLoggedIn ? '/connect' : '/login'} />
+              <Navigate to="/connect" />
             )
           }
         />
       </Routes>
     </div>
-  )
+  );
+}
+
+// STYLES
+const popupStyle = {
+  position: 'fixed',
+  top: '20px',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  background: '#10B981',
+  color: 'white',
+  padding: '12px 30px',
+  borderRadius: '50px',
+  boxShadow: '0 5px 15px rgba(0,0,0,0.2)',
+  zIndex: 9999,
+  fontWeight: 'bold',
+  animation: 'fadeIn 0.5s'
 }
 
 export default function App() {
