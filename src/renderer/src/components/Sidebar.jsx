@@ -6,58 +6,112 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Define the menu items and their corresponding Routes
   const menuItems = [
-    { id: '/dashboard', label: 'Drone Details' },     // Goes to Dashboard.jsx
-    { id: '/upgrade',   label: 'Firmware Upgrade' }, // Goes to FirmwareUpgrade.jsx
-    { id: '/advanced',  label: 'Advanced Settings' }, // Goes to AdvancedSettings.jsx
-    { id: '/reset',     label: 'Reset Parameters' }, // Goes to ResetParameters.jsx
-    { id: '/profile', label: 'Drone Profile' },
+    { label: 'AIRFRAME', id: '/airframe' },
+    { label: 'SENSORS', id: '/sensors' },
+    { label: 'SAFETY', id: '/safety' },
+    { label: 'FLIGHT MODES', id: '/flight-modes' },
+    { label: 'RC CALIBRATION', id: '/rc-calibration' },
+    { label: 'MOTOR AND ESC', id: '/motor-esc' },
+    { label: 'POWER', id: '/power' },
+    { label: 'SERIAL PARAM', id: '/serial-param' },
+    { label: 'CAMERA', id: '/camera' },
+    { label: 'SPRAYING CONFIG', id: '/spraying' },
+    { label: 'RESET PARAMETERS', id: '/reset' },
+    { label: 'ADVANCED SETTINGS', id: '/advanced' },
+    { label: 'LOG ANALYZER', id: '/logs' },
+    { label: 'FIRMWARE UPGRADE', id: '/upgrade' },
+    { label: 'DRONE DETAILS', id: '/profile' },
   ];
 
   return (
     <div style={{ 
-      width: '250px', 
+      width: '280px', 
       height: "100%", 
-      background: THEME.sidebar || '#FFFFFF', 
-      borderRight: `1px solid ${THEME.border}`, 
+      background: '#FFFFFF', 
+      borderRight: `1px solid #EEE`, 
       display: 'flex', 
-      flexDirection: 'column', 
-      padding: '20px' 
+      flexDirection: 'column',
+      boxSizing: 'border-box'
     }}>
-      {/* BRANDING */}
-      <h2 style={{ color: THEME.accent, marginBottom: '40px', paddingLeft: '10px' }}>
-        AVI GREEN
-      </h2>
+      {/* BRANDING - Fixed at top */}
+      <div style={{ padding: '40px 30px 20px 30px' }}>
+        <h2 style={{ 
+          color: THEME.accent, 
+          margin: 0, 
+          fontSize: '1.4em', 
+          letterSpacing: '1px',
+          fontWeight: 'bold' 
+        }}>
+          AVI GREEN
+        </h2>
+      </div>
       
-      {/* NAVIGATION MENU */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {menuItems.map((item) => {
-          // Check if this is the active page
+      {/* NAVIGATION MENU - Scrollable Area */}
+      <nav style={{ 
+        flex: 1, 
+        overflowY: 'auto', 
+        padding: '20px 30px',
+        display: 'flex', 
+        flexDirection: 'column',
+        scrollbarWidth: 'none', // Hide scrollbar for Firefox
+        msOverflowStyle: 'none' // Hide scrollbar for IE/Edge
+      }}>
+        {/* Hide scrollbar for Chrome/Safari */}
+        <style>
+          {`nav::-webkit-scrollbar { display: none; }`}
+        </style>
+
+        {menuItems.map((item, index) => {
           const isActive = location.pathname === item.id;
           
           return (
-            <button 
-              key={item.id}
-              onClick={() => navigate(item.id)}
-              style={{ 
-                padding: '15px', 
-                textAlign: 'left', 
-                background: isActive ? '#E6F9FF' : 'transparent',
-                color: isActive ? THEME.accent : '#666',
-                border: 'none', 
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontWeight: isActive ? 'bold' : 'normal',
-                fontSize: '1em',
-                transition: '0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px'
-              }}
-            >
-              {item.label}
-            </button>
+            <div key={item.id} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              {/* Vertical Line Connector */}
+              {index !== menuItems.length - 1 && (
+                <div style={{
+                  position: 'absolute',
+                  left: '11px',
+                  top: '25px',
+                  width: '2px',
+                  height: '30px',
+                  background: '#EEE',
+                  zIndex: 0
+                }} />
+              )}
+
+              <button 
+                onClick={() => navigate(item.id)}
+                style={{ 
+                  padding: '15px 0', 
+                  textAlign: 'left', 
+                  background: 'transparent',
+                  color: isActive ? THEME.accent : '#666',
+                  border: 'none', 
+                  cursor: 'pointer',
+                  fontWeight: isActive ? '600' : '400',
+                  fontSize: '0.9em',
+                  transition: '0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '20px',
+                  width: '100%',
+                  zIndex: 1
+                }}
+              >
+                {/* Circle Indicator */}
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  backgroundColor: isActive ? THEME.accent : '#777',
+                  flexShrink: 0,
+                  transition: 'background-color 0.3s'
+                }} />
+
+                {item.label}
+              </button>
+            </div>
           );
         })}
       </nav>

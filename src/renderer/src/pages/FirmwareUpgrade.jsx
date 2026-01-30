@@ -77,9 +77,8 @@ const FirmwareUpgrade = ({ onScan, onUploadStart }) => {
       // STRICT FILTER: Only accept ports with "Bootloader" in the name
       const bootloaderPort = latestPorts.find(p => {
          const name = (p.friendlyName || "").toLowerCase();
-         // We check for "bootloader" (Cube/ArduPilot standard)
-         // We also check for "stm32" (Raw DFU mode often shows as STM32 Virtual COM)
-         return name.includes("bootloader") || name.includes("stm32");
+         console.log(name,'name ports')
+         return name.includes("bootloader") || name.includes("stm32") || name.includes("serial device") || name.includes("usb");
       });
 
       if (bootloaderPort) {

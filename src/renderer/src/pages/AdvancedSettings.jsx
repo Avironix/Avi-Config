@@ -71,6 +71,9 @@ const AdvancedSettings = () => {
     setShowConfirmModal(false)
   }
 
+  console.log('values')
+
+
   const handleExport = () => {
     const dataStr =
       'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(parameters, null, 2))
@@ -309,7 +312,7 @@ const tableContainerStyle = {
   borderRadius: '8px',
   background: 'white'
 }
-const mainTableStyle = { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }
+const mainTableStyle = { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed',  }
 const stickyHeaderStyle = { position: 'sticky', top: 0, background: '#F8F9FA', zIndex: 5 }
 const thStyle = {
   padding: '12px',
@@ -323,7 +326,10 @@ const idCellStyle = {
   padding: '12px',
   borderBottom: '1px solid #EEE',
   fontFamily: 'monospace',
-  color: '#1F2937'
+  color: '#1F2937',
+  fontSize: '0.85em',
+  wordBreak: 'break-all', 
+  overflowWrap: 'anywhere'
 }
 const defCellStyle = {
   padding: '12px',
@@ -336,7 +342,10 @@ const descCellStyle = {
   borderBottom: '1px solid #EEE',
   color: '#4B5563',
   fontSize: '0.85em',
-  lineHeight: '1.5'
+  lineHeight: '1.5',
+  whiteSpace: 'normal', // ✅ Allows text to wrap to the next line
+  wordBreak: 'keep-all',
+  overflowWrap: 'break-word'
 }
 const inputStyle = {
   width: '100%',

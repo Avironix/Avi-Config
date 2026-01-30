@@ -16,55 +16,85 @@ import Header from './components/Header'
 
 // CONTEXT
 import { useMavlink } from './context/MavlinkContext'
+import SprayingConfig from './pages/SprayingConfig'
+import PowerSettings from './pages/PowerSettings'
+
+// Placeholder for new configuration pages
+const Placeholder = ({ name }) => (
+  <div style={{ padding: '40px', color: '#666', background: '#fff', flex: 1 }}>
+    <h2>{name}</h2>
+    <p>This module is currently under development.</p>
+  </div>
+)
 
 function AppContent() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showPopup, setShowPopup] = useState(false);
-  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [showPopup, setShowPopup] = useState(false)
+  const [isUpgrading, setIsUpgrading] = useState(false)
 
-  const { isConnected, isSyncing, mavData, disconnectDrone } = useMavlink();
-  const navigate = useNavigate();
-  
+  const { isConnected, isSyncing,  disconnectDrone } = useMavlink()
+  const navigate = useNavigate()
+
   // Use a hook to get the current location safely
-  const currentPath = window?.location?.hash || "";
+  const currentPath = window?.location?.hash || ''
 
   useEffect(() => {
     // 1. If we are upgrading, freeze all navigation logic
-    if (isUpgrading) return;
+    if (isUpgrading) return
 
     if (!isLoggedIn) {
-      navigate('/login');
-    } 
+      navigate('/login')
+    }
     // 2. Only redirect to connect if NOT on the upgrade page and NOT connected
-    else if (!isConnected && !currentPath.includes("upgrade")) {
-      navigate('/connect');
+    else if (!isConnected && !currentPath.includes('upgrade')) {
+      navigate('/connect')
     }
     // 3. Handle auto-navigation to dashboard when connection is restored
     else if (isConnected && !isSyncing) {
-      if (currentPath.includes('connect') || currentPath.includes('login') || currentPath === '#/') {
-        navigate('/dashboard');
-        setShowPopup(true);
-        setTimeout(() => setShowPopup(false), 3000);
+      if (
+        currentPath.includes('connect') ||
+        currentPath.includes('login') ||
+        currentPath === '#/'
+      ) {
+        navigate('/dashboard')
+        setShowPopup(true)
+        setTimeout(() => setShowPopup(false), 3000)
       }
     }
-  }, [isLoggedIn, isConnected, isSyncing, navigate, isUpgrading, currentPath]);
+  }, [isLoggedIn, isConnected, isSyncing, navigate, isUpgrading, currentPath])
 
-  const handleLogin = () => setIsLoggedIn(true);
-  const handleDisconnect = async () => await disconnectDrone();
+  const handleLogin = () => setIsLoggedIn(true)
+  const handleDisconnect = async () => await disconnectDrone()
 
-  // ✅ CRITICAL RENDER LOGIC: 
-  // We allow the "App Shell" to exist if we are connected OR if we are on the upgrade page
-  const canAccessShell = isLoggedIn && (isConnected || currentPath.includes("upgrade") || isUpgrading);
+  // ✅ AUTHORIZATION GATE:
+  // Allow shell access if connected OR currently on the upgrade route
+  const canAccessShell =
+    isLoggedIn && (isConnected || currentPath.includes('upgrade') || isUpgrading)
 
   return (
-    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#F3F4F6' }}>
+    <div
+      style={{
+        height: '100vh',
+        width: '100vw',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        background: '#ffffff'
+      }}
+    >
       {showPopup && <div style={popupStyle}>✅ Drone Connected & Synced</div>}
 
       <Routes>
-        <Route path="/login" element={!isLoggedIn ? <Login onLogin={handleLogin} /> : <Navigate to="/connect" />} />
+        {/* LOGIN & CONNECT ROUTES */}
+        <Route
+          path="/login"
+          element={!isLoggedIn ? <Login onLogin={handleLogin} /> : <Navigate to="/connect" />}
+        />
 
-        <Route path="/connect" element={
-            isLoggedIn && !isConnected && !currentPath.includes("upgrade") ? (
+        <Route
+          path="/connect"
+          element={
+            isLoggedIn && !isConnected && !currentPath.includes('upgrade') ? (
               <ConnectPage />
             ) : (
               <Navigate to="/dashboard" />
@@ -72,21 +102,46 @@ function AppContent() {
           }
         />
 
-        {/* PROTECTED APP SHELL */}
-        <Route path="/*" element={
+        {/* PROTECTED APP SHELL (Sidebar + Header + Content Area) */}
+        <Route
+          path="/*"
+          element={
             canAccessShell ? (
-              <div style={{ display: 'flex', height: '100%' }}>
-                {/* Optional: Hide sidebar during actual flash process for safety */}
+              <div style={{ display: 'flex', height: '100%', width: '100%' }}>
+                {/* Hide sidebar only during active flash process for safety */}
                 {!isUpgrading && <Sidebar />}
 
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                   <Header isConnected={isConnected} onDisconnect={handleDisconnect} />
 
-                  <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                  <div
+                    style={{ flex: 1, overflow: 'hidden',  position: 'relative' }}
+                  >
                     <Routes>
-                      <Route path="dashboard" element={<Dashboard mavData={mavData} />} />
-                      <Route path="profile" element={<DroneProfile mavData={mavData} />} />
-                      <Route path="upgrade" element={
+                      {/* TELEMETRY & PROFILE */}
+                      <Route path="dashboard" element={<Dashboard />} />
+                      <Route path="profile" element={<DroneProfile  />} />
+
+                      {/* CONFIGURATION MODULES (Placeholders for now) */}
+                      <Route path="airframe" element={<Placeholder name="Airframe" />} />
+                      <Route path="sensors" element={<Placeholder name="Sensors" />} />
+                      <Route path="safety" element={<Placeholder name="Safety" />} />
+                      <Route path="flight-modes" element={<Placeholder name="Flight Modes" />} />
+                      <Route
+                        path="rc-calibration"
+                        element={<Placeholder name="RC Calibration" />}
+                      />
+                      <Route path="motor-esc" element={<Placeholder name="Motor and ESC" />} />
+                      <Route path="power" element={<PowerSettings/>} />
+                      <Route path="serial-param" element={<Placeholder name="Serial Param" />} />
+                      <Route path="camera" element={<Placeholder name="Camera" />} />
+                      <Route path="spraying" element={<SprayingConfig />} />
+                      <Route path="logs" element={<Placeholder name="Log Analyzer" />} />
+
+                      {/* UTILITIES */}
+                      <Route
+                        path="upgrade"
+                        element={
                           <FirmwareUpgrade
                             onUpgradeStart={() => setIsUpgrading(true)}
                             onUpgradeEnd={() => setIsUpgrading(false)}
@@ -95,6 +150,8 @@ function AppContent() {
                       />
                       <Route path="advanced" element={<AdvancedSettings />} />
                       <Route path="reset" element={<ResetParameters />} />
+
+                      {/* FALLBACK */}
                       <Route path="*" element={<Navigate to="/dashboard" />} />
                     </Routes>
                   </div>
@@ -107,10 +164,9 @@ function AppContent() {
         />
       </Routes>
     </div>
-  );
+  )
 }
 
-// STYLES
 const popupStyle = {
   position: 'fixed',
   top: '20px',
