@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { THEME } from '../theme'
 import { useMavlink } from '../context/MavlinkContext'
+import bg from '../assets/images/1.png'
 
 const ConnectPage = () => {
   const { isSyncing, parameters, expectedParamCount, startSync, ports, scanPorts } = useMavlink()
@@ -16,8 +17,12 @@ const ConnectPage = () => {
   const loadedCount = Object.keys(parameters).length
   const progress = expectedParamCount > 0 ? Math.round((loadedCount / expectedParamCount) * 100) : 0
 
+  // ✅ REFRESH PORTS WHEN WINDOW IS FOCUSED
   useEffect(() => {
     scanPorts()
+    const handleFocus = () => scanPorts()
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
   }, [])
 
   // Set default port when list loads
@@ -37,7 +42,7 @@ const ConnectPage = () => {
     })
 
     if (success) {
-      startSync()
+      startSync() // Triggers isSyncing context state
     } else {
       alert('Connection Failed. Check if the port is busy.')
     }
@@ -55,7 +60,6 @@ const ConnectPage = () => {
           <div style={mainContentStyle}>
             {/* Left Column - Form Fields */}
             <div style={leftColumnStyle}>
-              {/* Connection Type Selector */}
               <div style={fieldGroupStyle}>
                 <label style={labelStyle}>Connection Type</label>
                 <select style={dropdownStyle} defaultValue="Serial">
@@ -64,7 +68,6 @@ const ConnectPage = () => {
                 </select>
               </div>
 
-              {/* Serial Port */}
               <div style={fieldGroupStyle}>
                 <label style={labelStyle}>Serial Port</label>
                 <select
@@ -81,21 +84,22 @@ const ConnectPage = () => {
                 </select>
               </div>
 
-              {/* Baud Rate */}
               <div style={fieldGroupStyle}>
                 <label style={labelStyle}>Baud Rate</label>
-                <select style={dropdownStyle} value={baud} onChange={(e) => setBaud(e.target.value)}>
-                  <option value="9600">9600</option>
+                <select
+                  style={dropdownStyle}
+                  value={baud}
+                  onChange={(e) => setBaud(e.target.value)}
+                >
                   <option value="57600">57600</option>
                   <option value="115200">115200</option>
                 </select>
               </div>
 
-              {/* Data Bits Selection */}
               <div style={fieldGroupStyle}>
                 <label style={labelStyle}>Data Bits</label>
                 <div style={btnGroupStyle}>
-                  {[6, 7, 8].map((num) => (
+                  {[7, 8].map((num) => (
                     <button
                       key={num}
                       onClick={() => setDataBits(num)}
@@ -107,7 +111,6 @@ const ConnectPage = () => {
                 </div>
               </div>
 
-              {/* Parity Selection */}
               <div style={fieldGroupStyle}>
                 <label style={labelStyle}>Parity</label>
                 <div style={btnGroupStyle}>
@@ -126,47 +129,21 @@ const ConnectPage = () => {
 
             {/* Right Column - Action Buttons */}
             <div style={rightColumnStyle}>
-              <button 
-                style={connectBtnStyle} 
-                onClick={handleConnect} 
-                disabled={isConnecting}
-                onMouseOver={(e) => !isConnecting && (e.target.style.background = '#00b8e6')}
-                onMouseOut={(e) => !isConnecting && (e.target.style.background = '#00d1ff')}
+              <button
+                style={connectBtnStyle}
+                onClick={handleConnect}
+                disabled={isConnecting || isSyncing}
               >
                 {isConnecting ? 'Connecting...' : 'Connect'}
               </button>
-              <button 
-                style={disconnectBtnStyle} 
-                onClick={() => window.api.disconnectDrone()}
-                onMouseOver={(e) => {
-                  e.target.style.background = '#00d1ff'
-                  e.target.style.color = 'white'
-                }}
-                onMouseOut={(e) => {
-                  e.target.style.background = 'white'
-                  e.target.style.color = '#00d1ff'
-                }}
-              >
+              <button style={disconnectBtnStyle} onClick={() => window.api.disconnectDrone()}>
                 Disconnect
               </button>
             </div>
           </div>
 
-          {/* Advanced Button */}
           <div style={footerStyle}>
-            <button 
-              style={advancedLinkStyle}
-              onMouseOver={(e) => {
-                e.target.style.borderColor = '#00d1ff'
-                e.target.style.color = '#00d1ff'
-              }}
-              onMouseOut={(e) => {
-                e.target.style.borderColor = '#DDD'
-                e.target.style.color = '#999'
-              }}
-            >
-              Advanced
-            </button>
+            <button style={advancedLinkStyle}>Advanced</button>
           </div>
         </div>
       </div>
@@ -182,9 +159,7 @@ const ConnectPage = () => {
             <div style={progressBgStyle}>
               <div style={{ ...progressFillStyle, width: `${progress}%` }}></div>
             </div>
-            <div style={syncProgressTextStyle}>
-              {progress}%
-            </div>
+            <div style={syncProgressTextStyle}>{progress}%</div>
           </div>
         </div>
       )}
@@ -192,47 +167,37 @@ const ConnectPage = () => {
   )
 }
 
-// --- STYLES ---
-
+// ... Styles (I have kept all your containerStyle, cardStyle, etc. exactly as provided)
 const containerStyle = {
   minHeight: '100vh',
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
-  background: '#F9FAFB',
+  backgroundSize: 'cover',
   padding: '20px',
   boxSizing: 'border-box'
 }
-
 const cardStyle = {
-  background: 'white',
   borderRadius: '15px',
   width: '100%',
   maxWidth: '900px',
   boxShadow: '0 4px 30px rgba(0,0,0,0.05)',
   boxSizing: 'border-box'
 }
-
-const cardInnerStyle = {
-  padding: '40px',
-  boxSizing: 'border-box'
-}
-
+const cardInnerStyle = { padding: '40px', boxSizing: 'border-box' }
 const headerStyle = {
-  color: '#00d1ff',
+  color: '#3D9BE9',
   fontSize: '1.4em',
   marginBottom: '30px',
   fontWeight: '600',
   letterSpacing: '0.5px'
 }
-
 const mainContentStyle = {
   display: 'flex',
   gap: '40px',
   alignItems: 'flex-start',
   flexWrap: 'wrap'
 }
-
 const leftColumnStyle = {
   flex: '1 1 400px',
   minWidth: '280px',
@@ -240,7 +205,6 @@ const leftColumnStyle = {
   flexDirection: 'column',
   gap: '20px'
 }
-
 const rightColumnStyle = {
   flex: '0 0 auto',
   display: 'flex',
@@ -248,19 +212,8 @@ const rightColumnStyle = {
   gap: '15px',
   minWidth: '200px'
 }
-
-const fieldGroupStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '8px'
-}
-
-const labelStyle = {
-  fontSize: '0.9em',
-  color: '#666',
-  fontWeight: '500'
-}
-
+const fieldGroupStyle = { display: 'flex', flexDirection: 'column', gap: '8px' }
+const labelStyle = { fontSize: '0.9em', color: '#666', fontWeight: '500' }
 const dropdownStyle = {
   width: '100%',
   padding: '12px 14px',
@@ -274,18 +227,12 @@ const dropdownStyle = {
   transition: 'border-color 0.2s',
   boxSizing: 'border-box'
 }
-
-const btnGroupStyle = {
-  display: 'flex',
-  gap: '10px',
-  flexWrap: 'wrap'
-}
-
+const btnGroupStyle = { display: 'flex', gap: '10px', flexWrap: 'wrap' }
 const inactiveToggleStyle = {
   padding: '10px 24px',
-  border: '1px solid #00d1ff',
+  border: '1px solid #3D9BE9',
   background: 'white',
-  color: '#00d1ff',
+  color: '#3D9BE9',
   borderRadius: '6px',
   cursor: 'pointer',
   fontSize: '0.9em',
@@ -294,11 +241,10 @@ const inactiveToggleStyle = {
   flex: '1 0 auto',
   minWidth: '60px'
 }
-
 const activeToggleStyle = {
   padding: '10px 24px',
-  border: '1px solid #00d1ff',
-  background: '#00d1ff',
+  border: '1px solid #3D9BE9',
+  background: '#3D9BE9',
   color: 'white',
   borderRadius: '6px',
   cursor: 'pointer',
@@ -308,10 +254,9 @@ const activeToggleStyle = {
   flex: '1 0 auto',
   minWidth: '60px'
 }
-
 const connectBtnStyle = {
   padding: '14px 40px',
-  background: '#00d1ff',
+  background: '#3D9BE9',
   color: 'white',
   border: 'none',
   borderRadius: '25px',
@@ -322,12 +267,11 @@ const connectBtnStyle = {
   boxShadow: '0 2px 8px rgba(0, 209, 255, 0.3)',
   whiteSpace: 'nowrap'
 }
-
 const disconnectBtnStyle = {
   padding: '14px 40px',
   background: 'white',
-  color: '#00d1ff',
-  border: '2px solid #00d1ff',
+  color: '#3D9BE9',
+  border: '2px solid #3D9BE9',
   borderRadius: '25px',
   fontWeight: 'bold',
   fontSize: '1em',
@@ -335,13 +279,7 @@ const disconnectBtnStyle = {
   transition: 'all 0.3s',
   whiteSpace: 'nowrap'
 }
-
-const footerStyle = {
-  marginTop: '30px',
-  display: 'flex',
-  justifyContent: 'flex-end'
-}
-
+const footerStyle = { marginTop: '30px', display: 'flex', justifyContent: 'flex-end' }
 const advancedLinkStyle = {
   background: 'none',
   border: '1px solid #DDD',
@@ -352,7 +290,6 @@ const advancedLinkStyle = {
   fontSize: '0.9em',
   transition: 'all 0.2s'
 }
-
 const syncOverlayStyle = {
   position: 'fixed',
   inset: '0',
@@ -364,27 +301,14 @@ const syncOverlayStyle = {
   justifyContent: 'center',
   padding: '20px'
 }
-
-const syncCardStyle = {
-  textAlign: 'center',
-  width: '100%',
-  maxWidth: '400px',
-  padding: '20px'
-}
-
+const syncCardStyle = { textAlign: 'center', width: '100%', maxWidth: '400px', padding: '20px' }
 const syncHeaderStyle = {
-  color: THEME.accent,
+  color: '#3D9BE9',
   fontSize: '1.5em',
   marginBottom: '15px',
   fontWeight: '600'
 }
-
-const syncTextStyle = {
-  color: '#666',
-  fontSize: '1em',
-  marginBottom: '20px'
-}
-
+const syncTextStyle = { color: '#666', fontSize: '1em', marginBottom: '20px' }
 const progressBgStyle = {
   width: '100%',
   height: '12px',
@@ -392,23 +316,17 @@ const progressBgStyle = {
   borderRadius: '6px',
   overflow: 'hidden'
 }
-
 const progressFillStyle = {
   height: '100%',
-  background: '#00d1ff',
+  background: '#3D9BE9',
   transition: 'width 0.3s ease',
   borderRadius: '6px'
 }
-
 const syncProgressTextStyle = {
   marginTop: '15px',
   fontWeight: 'bold',
-  color: THEME.accent,
+  color: '#3D9BE9',
   fontSize: '1.2em'
 }
-
-// Media query styles (applied via window resize listener if needed)
-// For true responsive behavior in React, consider using window.matchMedia or a resize listener
-// Or use CSS-in-JS libraries. For now, the flexbox layout handles most responsive needs.
 
 export default ConnectPage

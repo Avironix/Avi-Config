@@ -9,6 +9,8 @@ import DroneProfile from './pages/DroneProfile'
 import AdvancedSettings from './pages/AdvancedSettings'
 import FirmwareUpgrade from './pages/FirmwareUpgrade'
 import ResetParameters from './pages/ResetParameters'
+import SprayingConfig from './pages/SprayingConfig'
+import PowerSettings from './pages/PowerSettings'
 
 // COMPONENTS
 import Sidebar from './components/Sidebar'
@@ -16,41 +18,27 @@ import Header from './components/Header'
 
 // CONTEXT
 import { useMavlink } from './context/MavlinkContext'
-import SprayingConfig from './pages/SprayingConfig'
-import PowerSettings from './pages/PowerSettings'
-
-// Placeholder for new configuration pages
-const Placeholder = ({ name }) => (
-  <div style={{ padding: '40px', color: '#666', background: '#fff', flex: 1 }}>
-    <h2>{name}</h2>
-    <p>This module is currently under development.</p>
-  </div>
-)
 
 function AppContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [showPopup, setShowPopup] = useState(false)
   const [isUpgrading, setIsUpgrading] = useState(false)
 
-  const { isConnected, isSyncing,  disconnectDrone } = useMavlink()
+  const { isConnected, isSyncing, mavData, disconnectDrone } = useMavlink()
   const navigate = useNavigate()
 
-  // Use a hook to get the current location safely
   const currentPath = window?.location?.hash || ''
 
   useEffect(() => {
-    // 1. If we are upgrading, freeze all navigation logic
     if (isUpgrading) return
 
     if (!isLoggedIn) {
       navigate('/login')
     }
-    // 2. Only redirect to connect if NOT on the upgrade page and NOT connected
-    else if (!isConnected && !currentPath.includes('upgrade')) {
+    // ✅ FIX: Keep user on /connect if not connected OR if currently syncing
+    else if ((!isConnected || isSyncing) && !currentPath.includes('upgrade')) {
       navigate('/connect')
-    }
-    // 3. Handle auto-navigation to dashboard when connection is restored
-    else if (isConnected && !isSyncing) {
+    } else if (isConnected && !isSyncing) {
       if (
         currentPath.includes('connect') ||
         currentPath.includes('login') ||
@@ -66,10 +54,9 @@ function AppContent() {
   const handleLogin = () => setIsLoggedIn(true)
   const handleDisconnect = async () => await disconnectDrone()
 
-  // ✅ AUTHORIZATION GATE:
-  // Allow shell access if connected OR currently on the upgrade route
+  // ✅ Shell is only accessible after sync is finished, or during a firmware upgrade bypass
   const canAccessShell =
-    isLoggedIn && (isConnected || currentPath.includes('upgrade') || isUpgrading)
+    isLoggedIn && ((isConnected && !isSyncing) || isUpgrading || currentPath.includes('upgrade'))
 
   return (
     <div
@@ -85,7 +72,6 @@ function AppContent() {
       {showPopup && <div style={popupStyle}>✅ Drone Connected & Synced</div>}
 
       <Routes>
-        {/* LOGIN & CONNECT ROUTES */}
         <Route
           path="/login"
           element={!isLoggedIn ? <Login onLogin={handleLogin} /> : <Navigate to="/connect" />}
@@ -94,7 +80,7 @@ function AppContent() {
         <Route
           path="/connect"
           element={
-            isLoggedIn && !isConnected && !currentPath.includes('upgrade') ? (
+            isLoggedIn && (!isConnected || isSyncing) && !currentPath.includes('upgrade') ? (
               <ConnectPage />
             ) : (
               <Navigate to="/dashboard" />
@@ -102,61 +88,45 @@ function AppContent() {
           }
         />
 
-        {/* PROTECTED APP SHELL (Sidebar + Header + Content Area) */}
+        {/* PROTECTED APP SHELL */}
         <Route
           path="/*"
           element={
             canAccessShell ? (
-              <div style={{ display: 'flex', height: '100%', width: '100%' }}>
-                {/* Hide sidebar only during active flash process for safety */}
-                {!isUpgrading && <Sidebar />}
+              <>
+               <div style={{width:"100%", marginBottom:'10px'}}>
+                 <Header isConnected={isConnected} onDisconnect={handleDisconnect} />
+               </div>
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                  <Header isConnected={isConnected} onDisconnect={handleDisconnect} />
+                <div style={{ display: 'flex', height: '100%' }}>
+                  {!isUpgrading && <Sidebar />}
 
-                  <div
-                    style={{ flex: 1, overflow: 'hidden',  position: 'relative' }}
-                  >
-                    <Routes>
-                      {/* TELEMETRY & PROFILE */}
-                      <Route path="dashboard" element={<Dashboard />} />
-                      <Route path="profile" element={<DroneProfile  />} />
-
-                      {/* CONFIGURATION MODULES (Placeholders for now) */}
-                      <Route path="airframe" element={<Placeholder name="Airframe" />} />
-                      <Route path="sensors" element={<Placeholder name="Sensors" />} />
-                      <Route path="safety" element={<Placeholder name="Safety" />} />
-                      <Route path="flight-modes" element={<Placeholder name="Flight Modes" />} />
-                      <Route
-                        path="rc-calibration"
-                        element={<Placeholder name="RC Calibration" />}
-                      />
-                      <Route path="motor-esc" element={<Placeholder name="Motor and ESC" />} />
-                      <Route path="power" element={<PowerSettings/>} />
-                      <Route path="serial-param" element={<Placeholder name="Serial Param" />} />
-                      <Route path="camera" element={<Placeholder name="Camera" />} />
-                      <Route path="spraying" element={<SprayingConfig />} />
-                      <Route path="logs" element={<Placeholder name="Log Analyzer" />} />
-
-                      {/* UTILITIES */}
-                      <Route
-                        path="upgrade"
-                        element={
-                          <FirmwareUpgrade
-                            onUpgradeStart={() => setIsUpgrading(true)}
-                            onUpgradeEnd={() => setIsUpgrading(false)}
-                          />
-                        }
-                      />
-                      <Route path="advanced" element={<AdvancedSettings />} />
-                      <Route path="reset" element={<ResetParameters />} />
-
-                      {/* FALLBACK */}
-                      <Route path="*" element={<Navigate to="/dashboard" />} />
-                    </Routes>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <div
+                      style={{ flex: 1, overflow: 'hidden', position: 'relative', padding: '20px' }}
+                    >
+                      <Routes>
+                        <Route path="dashboard" element={<Dashboard mavData={mavData} />} />
+                        <Route path="profile" element={<DroneProfile mavData={mavData} />} />
+                        <Route path="spraying" element={<SprayingConfig />} />
+                        <Route path="power" element={<PowerSettings />} />
+                        <Route
+                          path="upgrade"
+                          element={
+                            <FirmwareUpgrade
+                              onUpgradeStart={() => setIsUpgrading(true)}
+                              onUpgradeEnd={() => setIsUpgrading(false)}
+                            />
+                          }
+                        />
+                        <Route path="advanced" element={<AdvancedSettings />} />
+                        <Route path="reset" element={<ResetParameters />} />
+                        <Route path="*" element={<Navigate to="/dashboard" />} />
+                      </Routes>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </>
             ) : (
               <Navigate to="/connect" />
             )
@@ -176,7 +146,6 @@ const popupStyle = {
   color: 'white',
   padding: '12px 30px',
   borderRadius: '50px',
-  boxShadow: '0 5px 15px rgba(0,0,0,0.2)',
   zIndex: 9999,
   fontWeight: 'bold',
   animation: 'fadeIn 0.5s'

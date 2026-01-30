@@ -179,7 +179,7 @@ const headerRowStyle = {
   alignItems: 'center',
   marginBottom: '40px'
 }
-const headerStyle = { color: '#00d1ff', margin: 0, fontSize: '1.2em' }
+const headerStyle = { color: '#3D9BE9', margin: 0, fontSize: '1.2em' }
 const gridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, 1fr)',
@@ -221,7 +221,7 @@ const progressBgStyle = {
   borderRadius: '10px',
   overflow: 'hidden'
 }
-const progressFillStyle = { height: '100%', background: '#00d1ff', transition: 'width 0.3s ease' }
+const progressFillStyle = { height: '100%', background: '#3D9BE9', transition: 'width 0.3s ease' }
 
 const refreshBtnStyle = {
   padding: '10px 20px',
@@ -235,7 +235,7 @@ const updateBtnStyle = {
   marginTop: '50px',
   float: 'right',
   padding: '12px 60px',
-  background: '#00d1ff',
+  background: '#3D9BE9',
   color: 'white',
   border: 'none',
   borderRadius: '25px',

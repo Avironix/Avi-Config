@@ -48,6 +48,7 @@ function createWindow() {
     width: 1280,
     height: 800,
     show: false,
+    frame:false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux'
       ? { icon: path.join(__dirname, '../../resources/icon.png') }
@@ -59,6 +60,7 @@ function createWindow() {
   })
 
   mainWindow.on('ready-to-show', () => {
+    mainWindow.maximize();
     mainWindow.show()
   })
   mainWindow.webContents.setWindowOpenHandler((details) => {

@@ -279,7 +279,7 @@ const headerRowStyle = {
   alignItems: 'center',
   marginBottom: '40px'
 }
-const headerStyle = { color: '#00d1ff', margin: 0, fontSize: '1.2em' }
+const headerStyle = { color: THEME.accent, margin: 0, fontSize: '1.2em' }
 const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '40px 60px' }
 const fieldWrapper = { display: 'flex', flexDirection: 'column', gap: '8px' }
 const labelStyle = { color: '#555', fontSize: '0.9em' }
@@ -291,8 +291,8 @@ const inputStyle = {
 }
 const calcLinkStyle = {
   background: 'none',
-  border: '1px solid #00d1ff',
-  color: '#00d1ff',
+  border: '1px solid #3D9BE9',
+  color: THEME.accent,
   borderRadius: '20px',
   padding: '5px 15px',
   marginTop: '5px',
@@ -303,7 +303,7 @@ const updateBtnStyle = {
   marginTop: '50px',
   float: 'right',
   padding: '12px 60px',
-  background: '#00d1ff',
+  background: THEME.accent,
   color: 'white',
   border: 'none',
   borderRadius: '25px',
@@ -336,7 +336,7 @@ const progressBgStyle = {
   borderRadius: '10px',
   overflow: 'hidden'
 }
-const progressFillStyle = { height: '100%', background: '#00d1ff', transition: 'width 0.3s ease' }
+const progressFillStyle = { height: '100%', background: THEME.accent, transition: 'width 0.3s ease' }
 
 const refreshBtnStyle = {
   padding: '10px 20px',
@@ -348,7 +348,7 @@ const refreshBtnStyle = {
 }
 const cancelBtnStyle = {
   padding: '10px 30px',
-  background: '#00d1ff',
+  background: THEME.accent,
   color: 'white',
   border: 'none',
   borderRadius: '25px',
@@ -357,8 +357,8 @@ const cancelBtnStyle = {
 const calcConfirmBtn = {
   padding: '10px 30px',
   background: 'none',
-  border: '1px solid #00d1ff',
-  color: '#00d1ff',
+  border: '1px solid #3D9BE9',
+  color: THEME.accent,
   borderRadius: '25px',
   cursor: 'pointer'
 }
